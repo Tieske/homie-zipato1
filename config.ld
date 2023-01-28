@@ -1,6 +1,6 @@
-project='[repo-name]'
-title='[module-name] docs'
-description='[short-description]'
+project='homie-zipato1'
+title='homie-zipato1 docs'
+description='Bridge between Homie and Zipabox1'
 
 format='markdown'
 use_markdown_titles = true
