@@ -36,7 +36,7 @@ build = {
 
   install = {
     bin = {
-      ["homie-zipato1"] = "bin/homie-zipato1.lua",
+      ["homie-zipato1-discover"] = "bin/homie-zipato1-discover.lua",
     }
   },
 
