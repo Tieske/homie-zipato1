@@ -1,6 +1,8 @@
---- Zipato bridge class.
+--- Zipato discovery.
 --
--- An instance represents a bridge for a Zipabox 1.
+-- Invoke via the CLI script. This will discover the Zipabox1 and write the
+-- configuration to a file. The file will be named `zipabox-<serial>.json` and
+-- will be written to the current directory.
 --
 -- @copyright Copyright (c) 2023-2023 Thijs Schreijer
 -- @author Thijs Schreijer
@@ -16,7 +18,6 @@ Bridge.__index = Bridge
 local copas = require("copas") -- load first to have mqtt detect Copas as the loop
 local mqtt = require "mqtt"
 local log = require("logging").defaultLogger()
-local Zipabox = require "homie-zipato1.zipato"
 local json = require("cjson.safe").new()
 local homie_utils = require("homie.utils")
 local pl_path = require("pl.path")

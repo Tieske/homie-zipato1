@@ -1,6 +1,9 @@
 #!/usr/bin/env lua
 
--- This is a simple script to discover all devices on a Zipato Zipabox
+--- CLI script to discover all devices on a Zipato Zipabox.
+-- This script is a wrapper around the homie-zipato1.discover module.
+--
+-- @script zipato-discover.lua
 
 package.path = package.path .. ";./src/?.lua;./src/?/init.lua"
 

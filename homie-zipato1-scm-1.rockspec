@@ -25,23 +25,22 @@ description = {
 
 dependencies = {
   "lua >= 5.1, < 5.5",
+  "homie",
+  "luabitop", -- for Lua 5.1 compatibility
 }
 
 build = {
   type = "builtin",
 
   modules = {
-    ["homie-zipato1.init"] = "src/homie-zipato1/init.lua",
+    ["homie-zipato1.devices"] = "src/homie-zipato1/devices.lua",
+    ["homie-zipato1.discover"] = "src/homie-zipato1/discover.lua",
   },
 
   install = {
     bin = {
-      ["homie-zipato1-discover"] = "bin/homie-zipato1-discover.lua",
+      ["zipato-discover"] = "bin/zipato-discover.lua",
+      ["homie-zipato"] = "bin/homie-zipato.lua",
     }
-  },
-
-  copy_directories = {
-    -- can be accessed by `luarocks homie-zipato1 doc` from the commandline
-    "docs",
   },
 }
