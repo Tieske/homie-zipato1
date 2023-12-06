@@ -27,6 +27,7 @@ dependencies = {
   "lua >= 5.1, < 5.5",
   "homie",
   "luabitop", -- for Lua 5.1 compatibility
+  "lua-cjson",
 }
 
 build = {
