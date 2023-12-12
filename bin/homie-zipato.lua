@@ -17,17 +17,21 @@ local json = require("cjson.safe").new()
 local device_data = require "homie-zipato1.devices"
 local subscriptions = {} -- handler function indexed by topic
 local requests = {} -- request-value indexed by topic
+local hass_config = {} -- HASS auto-discovery config indexed by topic
+local hass_subscriptions = {} -- HASS subscriptions; handler func indexed by topic
 
 local MQTT_URI = "mqtt://synology:1883"
+local DOMAIN = "homie"
+local HOMIE_DEVICE_ID = "zipabox-homie"
 
 
 local zipabox_client -- mqtt client, forward declaration, will be created later
 
 local homie_device = {
   uri = MQTT_URI,
-  domain = "homie",
+  domain = DOMAIN,
   broker_state = false,  -- not recovering state from broker
-  id = "zipabox-homie",
+  id = HOMIE_DEVICE_ID,
   homie = "4.0.0",
   extensions = "",
   name = "Zipato Zipabox",
@@ -84,6 +88,21 @@ for id, device in pairs(device_data.devices) do
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
     requests[device_data.templates.get_cmd:format(uuid)] = "get"
+    -- HASS stuff
+    local device_config = {
+      unique_id = "zipato:"..id,
+      name = id,
+      state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/power",
+      command_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/power/set",
+      payload_on = "true",
+      payload_off = "false",
+      state_on = "true",
+      state_off = "false",
+      qos = 1,
+      retain = false,
+    }
+    local config_topic = "homeassistant/switch/"..HOMIE_DEVICE_ID.."/"..id.."/config"
+    hass_config[config_topic] = json.encode(device_config)
 
 
 
@@ -107,6 +126,18 @@ for id, device in pairs(device_data.devices) do
         end
       subscriptions[device_data.templates.get_topic:format(uuid)] = handler
       subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+      -- HASS stuff
+      local device_config = {
+        unique_id = "zipato:"..id..":consumption",
+        name = id..":consumption",
+        device_class = "power",
+        state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/current-consumption",
+        unit_of_measurement = "W",
+        suggested_display_precision = 0,
+        qos = 1,
+      }
+      local config_topic = "homeassistant/sensor/"..HOMIE_DEVICE_ID.."/"..id..":consumption/config"
+      hass_config[config_topic] = json.encode(device_config)
     end
 
 
@@ -130,6 +161,19 @@ for id, device in pairs(device_data.devices) do
     end
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+    -- HASS stuff
+    local device_config = {
+      unique_id = "zipato:"..id..":motion",
+      name = id..":motion",
+      device_class = "motion",
+      payload_on = "true",
+      payload_off = "false",
+      state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/motion",
+      qos = 1,
+    }
+    local config_topic = "homeassistant/binary_sensor/"..HOMIE_DEVICE_ID.."/"..id..":motion/config"
+    hass_config[config_topic] = json.encode(device_config)
+
 
     local uuid = device.humidity
     node.properties.humidity =  {
@@ -150,6 +194,19 @@ for id, device in pairs(device_data.devices) do
     end
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+    -- HASS stuff
+    local device_config = {
+      unique_id = "zipato:"..id..":humidity",
+      name = id..":humidity",
+      device_class = "humidity",
+      state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/humidity",
+      unit_of_measurement = "%",
+      suggested_display_precision = 0,
+      qos = 1,
+    }
+    local config_topic = "homeassistant/sensor/"..HOMIE_DEVICE_ID.."/"..id..":humidity/config"
+    hass_config[config_topic] = json.encode(device_config)
+
 
     local uuid = device.luminance
     node.properties.luminance =  {
@@ -170,6 +227,18 @@ for id, device in pairs(device_data.devices) do
     end
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+    local device_config = {
+      unique_id = "zipato:"..id..":luminance",
+      name = id..":luminance",
+      device_class = "luminance",
+      state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/luminance",
+      unit_of_measurement = "lx",
+      suggested_display_precision = 0,
+      qos = 1,
+    }
+    local config_topic = "homeassistant/sensor/"..HOMIE_DEVICE_ID.."/"..id..":luminance/config"
+    hass_config[config_topic] = json.encode(device_config)
+
 
     local uuid = device.temperature
     node.properties.temperature =  {
@@ -190,12 +259,24 @@ for id, device in pairs(device_data.devices) do
     end
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+    local device_config = {
+      unique_id = "zipato:"..id..":temperature",
+      name = id..":temperature",
+      device_class = "temperature",
+      state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/temperature",
+      unit_of_measurement = "°C",
+      suggested_display_precision = 0,
+      qos = 1,
+    }
+    local config_topic = "homeassistant/sensor/"..HOMIE_DEVICE_ID.."/"..id..":temperature/config"
+    hass_config[config_topic] = json.encode(device_config)
 
 
 
   elseif device.level then                                              -- a dimmer
     local uuid = device.level
     local command_topic = device_data.templates.set_cmd:format(uuid)
+    local last_value = 100 -- last value set to level, so we can restore on power-on
     node.properties.level = {
       name = "level",
       datatype = "integer",
@@ -205,6 +286,7 @@ for id, device in pairs(device_data.devices) do
       unit = "%",
       format = "0:100",
       set = function(self, value, remote)
+        if value ~= 0 then last_value = value end
         if remote then
           -- The value is set over the Homie protocol, so we need to send it to the Zipabox
           -- We will not update the Homie value, since an update from the Zipabox will follow
@@ -236,7 +318,37 @@ for id, device in pairs(device_data.devices) do
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
     requests[device_data.templates.get_cmd:format(uuid)] = "get"
-
+    -- HASS stuff
+    local config_topic = "homeassistant/light/"..HOMIE_DEVICE_ID.."/"..id.."/config"
+    local set_topic = "homeassistant/light/"..HOMIE_DEVICE_ID.."/"..id.."/set"
+    local device_config = {
+      unique_id = "zipato:"..id,
+      name = id,
+      brightness_state_topic = DOMAIN .. "/" .. HOMIE_DEVICE_ID .. "/" .. id .. "/level",
+      brightness_scale = 100,
+      brightness_command_topic = set_topic,
+      command_topic = set_topic,
+      on_command_type = "brightness",
+      payload_on = "true",
+      payload_off = "false",
+      state_on = "true",
+      state_off = "false",
+      qos = 1,
+      retain = false,
+    }
+    hass_config[config_topic] = json.encode(device_config)
+    hass_subscriptions[set_topic] = function(msg)
+      local level = tonumber((msg.payload or {}).brightness)
+      if not level then
+        local state = (msg.payload or {}).state
+        level = state and last_value or 0
+      end
+      if level then
+        homie_device.nodes[id].properties.level:rset(tostring(level)) -- remote set
+      else
+        log:warn("device '%s' received bad level value '%s' from HASS set-topic", id, msg.payload)
+      end
+    end
 
 
   elseif device.setpoint then                                           -- a thermostat
@@ -282,6 +394,7 @@ for id, device in pairs(device_data.devices) do
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
     requests[device_data.templates.get_cmd:format(uuid)] = "get"
+    -- TODO: implement HASS stuff
 
     local uuid = device.temperature
     node.properties.temperature =  {
@@ -302,6 +415,7 @@ for id, device in pairs(device_data.devices) do
     end
     subscriptions[device_data.templates.get_topic:format(uuid)] = handler
     subscriptions[device_data.templates.update_topic:format(uuid)] = handler
+    -- TODO: implement HASS stuff
 
 
 
@@ -394,10 +508,78 @@ end
 
 
 
+
+--- we export the devices not just to Homie, but also to the HASS format.
+-- This is understood by Home Assistant (HASS), Domoticz and others.
+local hass_client do
+  local first_connect = true
+
+  hass_client = mqtt_client.create {
+    uri = MQTT_URI,
+    id = "hass-exporter",
+    clean = "first",
+    keep_alive = 60,
+    reconnect = 30,
+    version = mqtt_client.v311,
+  }
+  hass_client:on {
+    connect = function(pck, self)
+      if pck.rc ~= 0 then
+        return -- connection failed
+      end
+      -- succesfully connected
+      if not first_connect then
+        log:info("hass-exporter re-connected to MQTT broker")
+        return
+      end
+      first_connect = false
+      log:info("hass-exporter connected to MQTT broker")
+
+      -- subscribe to all topics
+      local ok, err = mqtt_utils.subscribe_topics(hass_client, hass_subscriptions, false, 60)
+      if not ok then
+        log:fatal("failed to subscribe to HASS set-topics: %s", err)
+        os.exit(1)
+      end
+
+      -- Announce all devices
+      local ok, err = mqtt_utils.publish_topics(hass_client, hass_config, 60)
+      if not ok then
+        log:fatal("failed to publish HASS config announcements: %s", err)
+        os.exit(1)
+      end
+    end,
+
+
+    message = function(msg, self)
+      -- handle received message
+      self:acknowledge(msg)
+
+      local payload = msg.payload
+      if payload then
+        local decoded = json.decode(payload)
+        if decoded then -- only replace if decoding actually worked...
+          msg.payload = decoded
+        end
+      end
+
+      local handler = hass_subscriptions[msg.topic]
+      if handler then
+        handler(msg)
+      else
+        log:warn("unknown MQTT message received: %s", msg.topic)
+      end
+    end,
+  }
+end
+
+
+
 homie_device = assert(require("homie.device").new(homie_device))
 
 copas(function()
   require("mqtt.loop").add(zipabox_client)
   copas.sleep(15)
   homie_device:start()
+  require("mqtt.loop").add(hass_client)
 end)
